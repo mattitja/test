@@ -2,7 +2,7 @@ openapi: 3.0.1
 info:
   title: Rental order orchestration (e.g. SIXT share)
   description: APIs for renting a vehicle
-  version: 1.1.0
+  version: 1.2.0
 servers:
   - url: '{stage}.hochbahn.cloud{basePath}'
     description: "The URL to the rental order orchestration."
@@ -51,17 +51,75 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RentalOrderResponseBody'
-        '500':
-          description: An technical error occurred.
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
+                freeReservationsLimitExceeded:
+                  value:
+                    httpStatusCode: 400
+                    server:
+                      time: '2019-05-28T14:07:17Z'
+                    error:
+                      code: FREE_RESERVATIONS_LIMIT_EXCEEDED
+                      message: Customer did too many reservations in a short amount of time.
+                priceNotFound:
+                  value:
+                    httpStatusCode: 400
+                    server:
+                      time: '2019-05-28T14:07:17Z'
+                    error:
+                      code: PRICE_NOT_FOUND
+                      message: MSP could not find given priceId in their system. Perhaps old priceId?
+                alreadyActiveRental:
+                  value:
+                    httpStatusCode: 400
+                    server:
+                      time: '2019-05-28T14:07:17Z'
+                    error:
+                      code: ALREADY_ACTIVE_RENTAL
+                      message: Customer has an already active rent, so could not start a second one.
+                vehicleNotAvailable:
+                  value:
+                    httpStatusCode: 400
+                    server:
+                      time: '2019-05-28T14:07:17Z'
+                    error:
+                      code: VEHICLE_NOT_AVAILABLE
+                      message: Vehicle is currently not available.
+                customerNotActivatedAtMsp:
+                  value:
+                    httpStatusCode: 400
+                    server:
+                      time: '2019-05-28T14:07:17Z'
+                    error:
+                      code: CUSTOMER_NOT_ACTIVATED_AT_MSP
+                      message: The customer is not yet activated for MSP
+                validationError:
+                  $ref: '#/components/examples/validationError'
+        '500':
+          description: An unknown or unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unknownMspError:
+                  $ref: '#/components/examples/unknownMspError'
                 generalError:
-                  $ref: '#/components/examples/general-error'
-                priceNotValid:
-                  $ref: '#/components/examples/price-not-valid'
+                  $ref: '#/components/examples/generalError'
+                rentalIsInUnexpectedState:
+                  $ref: '#/components/examples/rentalIsInUnexpectedState'
+                authenticationFailedAtMsp:
+                  $ref: '#/components/examples/authenticationFailedAtMsp'
+                refreshTokenExpiredAtMsp:
+                  $ref: '#/components/examples/refreshTokenExpiredAtMsp'
+                suspiciousCustomerActivityAtMsp:
+                  $ref: '#/components/examples/suspiciousCustomerActivityAtMsp'
+
   /rental/orders/{orderNumber}/actions/start:
     post:
       tags:
@@ -99,15 +157,61 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RentalOrderResponseBody'
-        '500':
-          description: An technical error occurred.
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
+                validationError:
+                  $ref: '#/components/examples/validationError'
+                errorUnlockingVehicle:
+                  value:
+                    httpStatusCode: 400
+                    server:
+                      time: '2019-05-28T14:07:17Z'
+                    error:
+                      code: ERROR_UNLOCKING_VEHICLE
+                      message: Could not unlock vehicle, because of an error.
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  $ref: '#/components/examples/notFound'
+        '409':
+          description: Conflict.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidPhase:
+                  $ref: '#/components/examples/invalidPhase'
+        '500':
+          description: An unknown or unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unknownMspError:
+                  $ref: '#/components/examples/unknownMspError'
                 generalError:
-                  $ref: '#/components/examples/general-error'
+                  $ref: '#/components/examples/generalError'
+                rentalIsInUnexpectedState:
+                  $ref: '#/components/examples/rentalIsInUnexpectedState'
+                authenticationFailedAtMsp:
+                  $ref: '#/components/examples/authenticationFailedAtMsp'
+                refreshTokenExpiredAtMsp:
+                  $ref: '#/components/examples/refreshTokenExpiredAtMsp'
+                suspiciousCustomerActivityAtMsp:
+                  $ref: '#/components/examples/suspiciousCustomerActivityAtMsp'
+
   /rental/orders/{orderNumber}/actions/finish:
     post:
       tags:
@@ -145,6 +249,80 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RentalOrderResponseBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                ignitionStillOn:
+                  value:
+                    httpStatusCode: 400
+                    server:
+                      time: '2019-05-28T14:07:17Z'
+                    error:
+                      code: IGNITION_STILL_ON
+                      message: Could not end rental, because the ignition is still on.
+                rentalAlreadyEnded:
+                  value:
+                    httpStatusCode: 400
+                    server:
+                      time: '2019-05-28T14:07:17Z'
+                    error:
+                      code: RENTAL_ALREADY_ENDED
+                      message: Given rental has already ended.
+                tooFarAway:
+                  value:
+                    httpStatusCode: 400
+                    server:
+                      time: '2019-05-28T14:07:17Z'
+                    error:
+                      code: TOO_FAR_AWAY
+                      message: Too far away. We currently don't know what that means.
+                vehicleInForbiddenArea:
+                  value:
+                    httpStatusCode: 400
+                    server:
+                      time: '2019-05-28T14:07:17Z'
+                    error:
+                      code: VEHICLE_IN_FORBIDDEN_AREA
+                      message: Vehicle is in forbidden area.
+                vehicleOutsideStartCity:
+                  value:
+                    httpStatusCode: 400
+                    server:
+                      time: '2019-05-28T14:07:17Z'
+                    error:
+                      code: VEHICLE_OUTSIDE_START_CITY
+                      message: Vehicle is outside of start city.
+                vehicleNotInAssignedRegionZone:
+                  value:
+                    httpStatusCode: 400
+                    server:
+                      time: '2019-05-28T14:07:17Z'
+                    error:
+                      code: VEHICLE_NOT_IN_ASSIGNED_REGION_ZONE
+                      message: Vehicle is not in assigned region zone.
+                errorLockingVehicle:
+                  value:
+                    httpStatusCode: 400
+                    server:
+                      time: '2019-05-28T14:07:17Z'
+                    error:
+                      code: ERROR_LOCKING_VEHICLE
+                      message: Could not lock vehicle, because of an error.
+                validationError:
+                  $ref: '#/components/examples/validationError'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  $ref: '#/components/examples/notFound'
         '409':
           description: Conflict.
           content:
@@ -152,17 +330,30 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
+                invalidPhase:
+                  $ref: '#/components/examples/invalidPhase'
                 additionalFeeNotValid:
-                  $ref: '#/components/examples/additional-fee-not-valid'
+                  $ref: '#/components/examples/additionalFeeNotValid'
         '500':
-          description: An technical error occurred.
+          description: An unknown or unexpected error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
+                unknownMspError:
+                  $ref: '#/components/examples/unknownMspError'
                 generalError:
-                  $ref: '#/components/examples/general-error'
+                  $ref: '#/components/examples/generalError'
+                rentalIsInUnexpectedState:
+                  $ref: '#/components/examples/rentalIsInUnexpectedState'
+                authenticationFailedAtMsp:
+                  $ref: '#/components/examples/authenticationFailedAtMsp'
+                refreshTokenExpiredAtMsp:
+                  $ref: '#/components/examples/refreshTokenExpiredAtMsp'
+                suspiciousCustomerActivityAtMsp:
+                  $ref: '#/components/examples/suspiciousCustomerActivityAtMsp'
+
   /rental/orders/{orderNumber}/actions/cancel:
     post:
       tags:
@@ -201,16 +392,25 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
                 notFound:
-                  $ref: '#/components/examples/not-found'
+                  $ref: '#/components/examples/notFound'
+        '409':
+          description: Conflict.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidPhase:
+                  $ref: '#/components/examples/invalidPhase'
         '500':
-          description: An technical error occurred.
+          description: A technical error occurred.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
                 generalError:
-                  $ref: '#/components/examples/general-error'
+                  $ref: '#/components/examples/generalError'
 components:
   securitySchemes:
     bearerAuth:
@@ -629,7 +829,7 @@ components:
               description: the error message
               example: Must be between 2 and 8 characters
   examples:
-    general-error:
+    generalError:
       value:
         {
           "httpStatusCode": 500,
@@ -638,22 +838,34 @@ components:
           },
           "error": {
             "code": "GENERAL_ERROR",
-            "message": "An internal, technical error occurred."
+            "message": "Something unexpected happened."
           }
         }
-    price-not-valid:
+    notFound:
       value:
         {
-          "httpStatusCode": 500,
+          "httpStatusCode": 404,
           "server": {
             "time": "2019-05-28T14:07:17Z"
           },
           "error": {
-            "code": "PRICE_NOT_VALID",
-            "message": "The given price and the real vehicle price do not match."
+            "code": "NOT_FOUND",
+            "message": "The requested rental order could not be found."
           }
         }
-    additional-fee-not-valid:
+    invalidPhase:
+      value:
+        {
+          "httpStatusCode": 409,
+          "server": {
+            "time": "2019-05-28T14:07:17Z"
+          },
+          "error": {
+            "code": "INVALID_PHASE",
+            "message": "The operation is not allowed in this rental phase."
+          }
+        }
+    additionalFeeNotValid:
       value:
         {
           "httpStatusCode": 409,
@@ -681,15 +893,83 @@ components:
           }
           ]
         }
-    not-found:
+    unknownMspError:
       value:
         {
-          "httpStatusCode": 404,
+          "httpStatusCode": 500,
           "server": {
             "time": "2019-05-28T14:07:17Z"
           },
           "error": {
-            "code": "NOT_FOUND",
-            "message": "The requested resource could not be found."
+            "code": "UNKNOWN_MSP_ERROR",
+            "message": "MSP sent an unknown error with errorCode [UNICORN_ERROR] and message [A unicorn blocks your car.]"
           }
+        }
+    rentalIsInUnexpectedState:
+      value:
+        {
+          "httpStatusCode": 500,
+          "server": {
+            "time": "2019-05-28T14:07:17Z"
+          },
+          "error": {
+            "code": "RENTAL_IS_IN_UNEXPECTED_STATE",
+            "message": "Expected was STARTING or STARTED"
+          }
+        }
+    authenticationFailedAtMsp:
+      value:
+        {
+          "httpStatusCode": 500,
+          "server": {
+            "time": "2019-05-28T14:07:17Z"
+          },
+          "error": {
+            "code": "AUTHENTICATION_FAILED_AT_MSP",
+            "message": "Could not authenticate against MSP: [cause]"
+          }
+        }
+    refreshTokenExpiredAtMsp:
+      value:
+        {
+          "httpStatusCode": 500,
+          "server": {
+            "time": "2019-05-28T14:07:17Z"
+          },
+          "error": {
+            "code": "REFRESH_TOKEN_EXPIRED_AT_MSP",
+            "message": "The refresh token from MSP expired: [cause]"
+          }
+        }
+    suspiciousCustomerActivityAtMsp:
+      value:
+        {
+          "httpStatusCode": 500,
+          "server": {
+            "time": "2019-05-28T14:07:17Z"
+          },
+          "error": {
+            "code": "SUSPICIOUS_CUSTOMER_ACTIVITY_AT_MSP",
+            "message": "MSP temporarily blocked the customer, because they have detected some suspicious activity on his/her account, e.g. suspicious drivers licence number."
+          }
+        }
+    validationError:
+      value:
+        {
+          "httpStatusCode": 400,
+          "server": {
+            "time": "2019-05-28T14:07:17Z"
+          },
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Request is invalid"
+          },
+          "fields": [
+          {
+            "name": "additionalFee.grossAmount",
+            "error": {
+              "code": "NOT_NULL",
+              "message": "Can't be literally null"
+            }
+          }]
         }
