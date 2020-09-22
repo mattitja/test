@@ -1,0 +1,695 @@
+openapi: 3.0.1
+info:
+  title: Rental order orchestration (e.g. SIXT share)
+  description: APIs for renting a vehicle
+  version: 1.1.0
+servers:
+  - url: '{stage}.hochbahn.cloud{basePath}'
+    description: "The URL to the rental order orchestration."
+    variables:
+      stage:
+        enum:
+          - 'api.dev' # The development server
+          - 'api.qa'  # The testing server
+          - 'api'    # The live server
+        default: 'api.qa'
+        description: The current server environment.
+paths:
+  /rental/{rentalMobilityServiceProvider}/order:
+    post:
+      tags:
+        - Rental Services
+      security:
+        - bearerAuth:
+            - Registered
+      summary: Order a vehicle
+      operationId: requestSingleOrder
+      parameters:
+        - name: rentalMobilityServiceProvider
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/RentalMobilityServiceProvider'
+        - name: Accept-Language
+          in: header
+          description: The expected language of the response. Defaults to 'de' if not set.
+          required: false
+          schema:
+            type: string
+            default: de
+      requestBody:
+        description: request
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RentalOrderRequestBody'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RentalOrderResponseBody'
+        '500':
+          description: An technical error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                generalError:
+                  $ref: '#/components/examples/general-error'
+                priceNotValid:
+                  $ref: '#/components/examples/price-not-valid'
+  /rental/orders/{orderNumber}/actions/start:
+    post:
+      tags:
+        - Rental Services
+      security:
+        - bearerAuth:
+            - Registered
+      summary: Start the rental
+      operationId: startRentalForOrder
+      parameters:
+        - name: orderNumber
+          in: path
+          description: The order to be started
+          required: true
+          schema:
+            type: string
+        - name: Accept-Language
+          in: header
+          description: Accept-Language
+          required: false
+          schema:
+            type: string
+            default: de
+      requestBody:
+        description: request
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RentalStartRequestBody'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RentalOrderResponseBody'
+        '500':
+          description: An technical error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                generalError:
+                  $ref: '#/components/examples/general-error'
+  /rental/orders/{orderNumber}/actions/finish:
+    post:
+      tags:
+        - Rental Services
+      security:
+        - bearerAuth:
+            - Registered
+      summary: Finish the rental
+      operationId: finishRentalForOrder
+      parameters:
+        - name: orderNumber
+          in: path
+          description: The order to be finished
+          required: true
+          schema:
+            type: string
+        - name: Accept-Language
+          in: header
+          description: Accept-Language
+          required: false
+          schema:
+            type: string
+            default: de
+      requestBody:
+        description: request
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RentalFinishRequestBody'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RentalOrderResponseBody'
+        '409':
+          description: Conflict.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                additionalFeeNotValid:
+                  $ref: '#/components/examples/additional-fee-not-valid'
+        '500':
+          description: An technical error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                generalError:
+                  $ref: '#/components/examples/general-error'
+  /rental/orders/{orderNumber}/actions/cancel:
+    post:
+      tags:
+        - Rental Services
+      security:
+        - bearerAuth:
+            - Registered
+      summary: Cancel a reservation
+      operationId: cancelReservation
+      parameters:
+        - name: orderNumber
+          in: path
+          description: The order number of the reservation to be cancelled
+          required: true
+          schema:
+            type: string
+        - name: Accept-Language
+          in: header
+          description: Accept-Language
+          required: false
+          schema:
+            type: string
+            default: de
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RentalOrderResponseBody'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  $ref: '#/components/examples/not-found'
+        '500':
+          description: An technical error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                generalError:
+                  $ref: '#/components/examples/general-error'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    RentalOrderRequestBody:
+      title: RentalOrderRequest
+      description: The request for starting a vehicle reservation.
+      type: object
+      required:
+        - vehicleId
+        - pricePerMinute
+      properties:
+        vehicleId:
+          type: string
+          description: The vehicle id to rent
+          example: b0bbe52c-66af-4e77-acb9-eaecd8d45b0d
+        pricePerMinute:
+          $ref: '#/components/schemas/Price'
+        pickupFee:
+          $ref: '#/components/schemas/Price'
+        priceId:
+          $ref: '#/components/schemas/PriceId'
+        secureElement:
+          type: string
+          maxLength: 64
+          description: Only relevant for payments via PayPal; a security element created by the client using the Magnes Risk Library.
+          example: "ABCDEFG"
+    RentalStartRequestBody:
+      type: object
+      description: The request for starting a rent
+      properties:
+        pin:
+          type: string
+          example: 1234
+          description: The personal pin of the customer
+        coordinates:
+          $ref: '#/components/schemas/GeoCoordinate'
+    RentalFinishRequestBody:
+      type: object
+      description: The request for finishing the rent
+      properties:
+        acceptedAdditionalFee:
+          type: boolean
+          example: true
+          description: Defines if the user has accepted additional fee
+        additionalFee:
+          $ref: '#/components/schemas/Price'
+    Price:
+      title: The common price object.
+      description: price object
+      required:
+        - grossAmount
+        - currency
+      properties:
+        grossAmount:
+          type: integer
+          description: contains the gross price in Eurocent
+          example: 123
+        netAmount:
+          type: integer
+          description: contains the net price in Eurocent
+          example: 90
+        vatPercent:
+          type: integer
+          description: Value Added Taxes in percent
+          example: 20
+        currency:
+          type: string
+          description: currency abbreviation according to ISO 4217
+          example: "EUR"
+    PriceId:
+      description: price id object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          description: contains the price id
+          example: 123
+    Restriction:
+      type: object
+      required:
+        - restrictionType
+      properties:
+        restrictionType:
+          $ref: '#/components/schemas/RestrictionType'
+        restrictionValue:
+          type: integer
+    Unit:
+      type: object
+      required:
+        - unitType
+      properties:
+        unitType:
+          $ref: '#/components/schemas/UnitType'
+        unitValue:
+          type: integer
+    PricePerUnit:
+      type: object
+      required:
+        - price
+        - unit
+        - usage
+      properties:
+        price:
+          $ref: '#/components/schemas/Price'
+        unit:
+          $ref: '#/components/schemas/Unit'
+        usage:
+          $ref: '#/components/schemas/UsageType'
+        restrictions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Restriction'
+    UnitType:
+      type: string
+      enum:
+        - 'FIXED'
+        - 'PER_MINUTE'
+        - 'PER_KILOMETER'
+        - 'PER_DAY'
+        - 'PER_HOUR'
+    UsageType:
+      type: string
+      enum:
+        - 'RESERVATION'
+        - 'DRIVING'
+        - 'PARKING'
+        - 'PICKUP_FEE'
+        - 'DROPOFF_FEE'
+        - 'BASIC_FEE'
+    RestrictionType:
+      type: string
+      enum:
+        - 'ON_WORKDAYS'
+        - 'ON_WEEKENDS'
+        - 'AT_NIGHT'
+        - 'FROM_KILOMETERS'
+        - 'FROM_MINUTES'
+    RentalOrderResponseBody:
+      type: object
+      description: The response object containing all information about a rental order.
+      required:
+        - createdAt
+        - updatedAt
+        - lastStateUpdate
+        - mobilityServiceProvider
+        - orderNumber
+        - mspType
+        - state
+        - vehicleModel
+        - vehicleLabel
+        - phase
+        - startCoordinates
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+          description: When this entry is created. The time is in UTC format with optional zone offset.
+          example: '2017-07-21T17:32:28Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: When this entry is updated. The time is in UTC format with optional zone offset.
+          example: '2017-07-21T17:32:28Z'
+        mobilityServiceProvider:
+          $ref: '#/components/schemas/RentalMobilityServiceProvider'
+        orderNumber:
+          type: string
+          example: "A12345"
+        mobilityServiceProviderOrderReference:
+          type: string
+          description: The reference number of the mobility service provider (e.g. ticket number in ticketing)
+          example: "123456"
+        mspType:
+          $ref: '#/components/schemas/MspType'
+        activeUntil:
+          type: string
+          format: date-time
+          description: How long should the booking be active? The time is in UTC format with optional zone offset.
+          example: '2017-07-21T17:32:28Z'
+        state:
+          $ref: '#/components/schemas/OrderState'
+        cancelReason:
+          $ref: '#/components/schemas/GenericOrderCancel'
+        pricesPerUnit:
+          type: array
+          items:
+            $ref: '#/components/schemas/PricePerUnit'
+        price:
+          $ref: '#/components/schemas/Price'
+        priceId:
+          $ref: '#/components/schemas/PriceId'
+        lastStateUpdate:
+          type: string
+          format: date-time
+          description: When is the state updated. The time is in UTC format with optional zone offset.
+          example: '2017-07-21T17:32:28Z'
+        billNumber:
+          type: string
+          description: The corresponding bill number for this order
+          example: '4000100049'
+        reservedAt:
+          type: string
+          format: date-time
+          description: The start time of the reservation. The time is in UTC format with optional zone offset.
+          example: "2019-05-28T12:01:00Z"
+        reservedUntil:
+          type: string
+          format: date-time
+          description: The end time of the reservation. The time is in UTC format with optional zone offset.
+          example: "2019-05-28T12:01:00Z"
+        rentedAt:
+          type: string
+          format: date-time
+          description: The start time of the rent. The time is in UTC format with optional zone offset.
+          example: "2019-05-28T12:01:00Z"
+        startAddress:
+          $ref: '#/components/schemas/Address'
+        endAddress:
+          $ref: '#/components/schemas/Address'
+        startCoordinates:
+          $ref: '#/components/schemas/GeoCoordinate'
+        endCoordinates:
+          $ref: '#/components/schemas/GeoCoordinate'
+        totalDuration:
+          type: integer
+          description: The total travel time in minutes.
+          example: 12
+        totalDistance:
+          type: number
+          format: float
+          description: The total travelled distance, in kilometers.
+          example: 12,4
+        phase:
+          $ref: '#/components/schemas/MspRentalPhase'
+        vehicleBrand:
+          type: string
+          description: The brand of the vehicle.
+          example: "Mercedes"
+        vehicleModel:
+          type: string
+          description: The model of the vehicle (internationalized).
+          example: "A-Klasse"
+        vehicleLabel:
+          type: string
+          description: The label identifying the vehicle.
+          example: "HH ABC 123"
+        imageUrl:
+          type: string
+          description: The image url of the vehicle/bike/scooter.
+          example: "https://example.com/myImage.jpg"
+    OrderState:
+      type: string
+      enum: [AUTHORIZED, AVAILABLE, BILLABLE, CANCELED, CONFIRMED, CREATED, FINISHED, REJECTED, SERVICE_PROVIDED, REFUND, REFUNDED]
+      description: >
+        Status of an ordering:
+         * `AUTHORIZED` - The order has been authorized by the payment service provider.
+         * `AVAILABLE` - The service for the order is available (e.g. shuttle -> passenger is waiting for the shuttle).
+         * `BILLABLE` - The order is in the billing process.
+         * `CANCELED` - The order has been canceled.
+         * `CONFIRMED` - The order has been captured by the payment service provider.
+         * `CREATED` - The order has been created.
+         * `FINISHED` - The order has been finished.
+         * `REJECTED` - The order has been rejected by the payment service provider.
+         * `SERVICE_PROVIDED` - The service for the order has been provided.
+         * `REFUND` - There exists a refund request for this order.
+         * `REFUNDED` - The order has been refunded.
+    GenericOrderCancel:
+      type: object
+      description: Cancel order request.
+      required:
+        - externalTrigger
+        - triggeredBy
+      properties:
+        reasonCode:
+          $ref: '#/components/schemas/ReasonCode'
+        externalTrigger:
+          type: boolean
+          example: false
+          description: Has the order been canceled by an external trigger?
+        triggeredBy:
+          $ref: '#/components/schemas/TriggeredBy'
+    TriggeredBy:
+      type: string
+      enum:
+        - USER
+        - SUPPORT
+        - SYSTEM
+      description: The trigger for e.g. a status change.
+      example: "SYSTEM"
+    ReasonCode:
+      type: string
+      enum:
+        - GENERAL_MSP
+        - CUSTOMER
+      description: Describes the reason code for the cancellation.
+      example: "GENERAL_MSP"
+    RentalMobilityServiceProvider:
+      type: string
+      enum:
+        - SIXT_SHARE
+      description: mobility service provider that is providing the rental service
+      example: "SIXT_SHARE"
+    Address:
+      description: Represents an Address
+      title: Address
+      type: object
+      properties:
+        city:
+          type: string
+          description: the city of the address
+          example: "Wien"
+        zipCode:
+          type: string
+          description: the zip code of the address
+          example: "1060"
+        streetname:
+          type: string
+          description: the street of the address
+          example: "Webgasse"
+        houseNumber:
+          type: string
+          description: the housenumber of the address
+          example: "24/8"
+    GeoCoordinate:
+      title: MspGeoCoordinate
+      type: object
+      required:
+        - latitude
+        - longitude
+      properties:
+        latitude:
+          type: number
+          description: The latitude of the location
+          format: float
+          example: 53.5358
+        longitude:
+          type: number
+          description: The longitude of the location
+          format: float
+          example: 9.952722
+    MspRentalPhase:
+      type: string
+      enum: [ACTIVE_RESERVATION, STARTING_RENT, ACTIVE_RENT, ENDING_RENT, FINISHED_RENT, EXPIRED_RESERVATION, CANCELLED_RESERVATION]
+      example: "ACTIVE_RESERVATION"
+      description: >
+        phase of the rental journey of the customer:
+         * `ACTIVE_RESERVATION` - The reservation is still active
+         * `STARTING_RENT` - The rent is currently starting
+         * `ACTIVE_RENT` - The rent is still active
+         * `ENDING_RENT` - The rent is currently ending
+         * `FINISHED_RENT` - The rent is finished
+         * `EXPIRED_RESERVATION` - The reservation is expired
+         * `CANCELLED_RESERVATION` - The reservation is cancelled by the user
+    MspType:
+      type: string
+      enum: [RENTAL]
+      description: >
+        The type of a mobility service provider:
+         * `RENTAL` - A rental service, e.g. car2go
+    ErrorResponse:
+      type: object
+      required:
+        - httpStatusCode
+        - server
+      properties:
+        httpStatusCode:
+          type: integer
+          description: the http status code.
+          example: 400
+        server:
+          type: object
+          description: Contains technical information about the emitting server.
+          properties:
+            time:
+              type: string
+              format: date-time
+              description: The time in UTC format. A zone offset may be used.
+              example: 2015-05-28T14:07:17Z
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: A machine readable identification of the error.
+              example: NOT_VALID
+            message:
+              type: string
+              description: |
+                A short, summary of the problem. Written in english and readable by technical stakeholders. Not localized.
+              example: The data are not valid
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorResponseField'
+    ErrorResponseField:
+      type: object
+      description: A list of validation errors.
+      properties:
+        name:
+          type: string
+          description: The field name. Same name as in the request using json path.
+          example: address.zip
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: A machine readable identification of the error.
+              example: TOO_SHORT
+            message:
+              type: string
+              description: the error message
+              example: Must be between 2 and 8 characters
+  examples:
+    general-error:
+      value:
+        {
+          "httpStatusCode": 500,
+          "server": {
+            "time": "2019-05-28T14:07:17Z"
+          },
+          "error": {
+            "code": "GENERAL_ERROR",
+            "message": "An internal, technical error occurred."
+          }
+        }
+    price-not-valid:
+      value:
+        {
+          "httpStatusCode": 500,
+          "server": {
+            "time": "2019-05-28T14:07:17Z"
+          },
+          "error": {
+            "code": "PRICE_NOT_VALID",
+            "message": "The given price and the real vehicle price do not match."
+          }
+        }
+    additional-fee-not-valid:
+      value:
+        {
+          "httpStatusCode": 409,
+          "server": {
+            "time": "2019-05-28T14:07:17Z"
+          },
+          "error": {
+            "code": "ADDITIONAL_FEE_NOT_VALID",
+            "message": "The given additional fee and the real additional fee do not match."
+          },
+          "fields": [
+          {
+            "name": "additionalFee.grossAmount",
+            "error": {
+              "code": "Equal",
+              "message": "1000"
+            }
+          },
+          {
+            "name": "additionalFee.currency",
+            "error": {
+              "code": "Equal",
+              "message": "EUR"
+            }
+          }
+          ]
+        }
+    not-found:
+      value:
+        {
+          "httpStatusCode": 404,
+          "server": {
+            "time": "2019-05-28T14:07:17Z"
+          },
+          "error": {
+            "code": "NOT_FOUND",
+            "message": "The requested resource could not be found."
+          }
+        }
